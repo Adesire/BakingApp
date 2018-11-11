@@ -15,7 +15,7 @@
             android:id="@+id/textView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="RECIPIES"
+            android:text="@string/recipies"
             android:textAlignment="center"
             android:textSize="30sp"
             android:textStyle="bold" />

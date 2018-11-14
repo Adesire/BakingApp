@@ -3,6 +3,10 @@ package com.example.android.bakingapp;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.annotation.VisibleForTesting;
+import android.support.test.espresso.IdlingResource;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.GridLayoutManager;
@@ -10,6 +14,7 @@ import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.JsonHttpResponseHandler;
@@ -31,6 +36,22 @@ public class MainActivity extends AppCompatActivity implements RecipiesGridAdapt
     SharedPreferences.Editor editor;
     public static final String PREF_DATA = "pref_data";
 
+
+    @Nullable
+    private SimpleIdlingResource mIdlingResource;
+
+    /**
+     * Only called from test, creates and returns a new {@link SimpleIdlingResource}.
+     */
+    @VisibleForTesting
+    @NonNull
+    public IdlingResource getIdlingResource() {
+        if (mIdlingResource == null) {
+            mIdlingResource = new SimpleIdlingResource();
+        }
+        return mIdlingResource;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -39,13 +60,14 @@ public class MainActivity extends AppCompatActivity implements RecipiesGridAdapt
         recipeGrid = (RecyclerView)findViewById(R.id.recipe_grid);
         mLayoutManager = new GridLayoutManager(MainActivity.this,2,GridLayoutManager.VERTICAL,false);
         recipeGrid.setLayoutManager(mLayoutManager);
+        getIdlingResource();
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        if (!sharedPreferences.contains(PREF_DATA))
+        if (!sharedPreferences.contains(PREF_DATA)){
             networkingProtocols();
+        }
         else {
             try {
                 showData(new JSONArray(sharedPreferences.getString(PREF_DATA, "")));
-                Log.e("ddd", sharedPreferences.getString("4", "hh"));
             } catch (JSONException e) {
                 e.printStackTrace();
                 networkingProtocols();
@@ -61,19 +83,24 @@ public class MainActivity extends AppCompatActivity implements RecipiesGridAdapt
     }
     
     public void networkingProtocols(){
+        mIdlingResource.setIdleState(false);
+        Toast.makeText(this, "Loading", Toast.LENGTH_LONG).show();
         AsyncHttpClient client = new AsyncHttpClient();
         client.get(URL,new JsonHttpResponseHandler(){
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONArray response) {
                 super.onSuccess(statusCode, headers, response);
-                editor = sharedPreferences.edit();
-                editor.putString(PREF_DATA, response.toString());
-                for (int i = 0; i < response.length(); i++){
-                    JSONObject o = response.optJSONObject(i);
-                    String ing = o.optJSONArray("ingredients").toString();
-                    editor.putString(String.valueOf(i+1), ing);
+                if(!(sharedPreferences.getString(PREF_DATA,"")).equals(response.toString())){
+                    editor = sharedPreferences.edit();
+                    editor.putString(PREF_DATA, response.toString());
+                    for (int i = 0; i < response.length(); i++){
+                        JSONObject o = response.optJSONObject(i);
+                        String ing = o.optJSONArray("ingredients").toString();
+                        editor.putString(String.valueOf(i+1), ing);
+                    }
+                    editor.apply();
                 }
-                editor.apply();
+                mIdlingResource.setIdleState(true);
                 showData(response);
             }
 
